@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>API 测试页面</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .test-section {
+            background: white;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        button {
+            background: #4ecca3;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background: #45b393;
+        }
+        .result {
+            background: #f8f9fa;
+            padding: 10px;
+            border-radius: 4px;
+            margin-top: 10px;
+            white-space: pre-wrap;
+            font-family: monospace;
+        }
+        input[type="file"] {
+            margin: 10px 0;
+        }
+    </style>
+</head>
+<body>
+    <h1>AppieMusic API 测试页面</h1>
+    
+    <div class="test-section">
+        <h2>1. 测试获取音乐列表</h2>
+        <button onclick="testGetMusic()">获取音乐列表</button>
+        <div id="getMusicResult" class="result"></div>
+    </div>
+    
+    <div class="test-section">
+        <h2>2. 测试上传音乐文件</h2>
+        <input type="file" id="musicFile" accept="audio/*">
+        <br>
+        <input type="text" id="title" placeholder="歌曲标题（可选）">
+        <input type="text" id="artist" placeholder="艺术家（可选）">
+        <br>
+        <button onclick="testUploadMusic()">上传音乐</button>
+        <div id="uploadResult" class="result"></div>
+    </div>
+    
+    <div class="test-section">
+        <h2>3. 服务器状态</h2>
+        <button onclick="testServerStatus()">检查服务器状态</button>
+        <div id="statusResult" class="result"></div>
+    </div>
+
+    <script>
+        const API_BASE_URL = 'http://localhost:3000/api';
+
+        async function testGetMusic() {
+            const resultDiv = document.getElementById('getMusicResult');
+            try {
+                resultDiv.textContent = '正在获取音乐列表...';
+                const response = await fetch(`${API_BASE_URL}/music`);
+                const result = await response.json();
+                resultDiv.textContent = JSON.stringify(result, null, 2);
+            } catch (error) {
+                resultDiv.textContent = '错误: ' + error.message;
+            }
+        }
+
+        async function testUploadMusic() {
+            const resultDiv = document.getElementById('uploadResult');
+            const fileInput = document.getElementById('musicFile');
+            const titleInput = document.getElementById('title');
+            const artistInput = document.getElementById('artist');
+
+            if (!fileInput.files[0]) {
+                resultDiv.textContent = '请选择一个音频文件';
+                return;
+            }
+
+            try {
+                resultDiv.textContent = '正在上传文件...';
+                const formData = new FormData();
+                formData.append('musicFile', fileInput.files[0]);
+                formData.append('title', titleInput.value);
+                formData.append('artist', artistInput.value);
+
+                const response = await fetch(`${API_BASE_URL}/music/upload`, {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const result = await response.json();
+                resultDiv.textContent = JSON.stringify(result, null, 2);
+            } catch (error) {
+                resultDiv.textContent = '错误: ' + error.message;
+            }
+        }
+
+        async function testServerStatus() {
+            const resultDiv = document.getElementById('statusResult');
+            try {
+                resultDiv.textContent = '正在检查服务器状态...';
+                const response = await fetch('http://localhost:3000/api/music');
+                if (response.ok) {
+                    resultDiv.textContent = '✅ 服务器运行正常\n端口: 3000\n状态: ' + response.status;
+                } else {
+                    resultDiv.textContent = '❌ 服务器响应异常\n状态码: ' + response.status;
+                }
+            } catch (error) {
+                resultDiv.textContent = '❌ 无法连接到服务器\n错误: ' + error.message + '\n\n请确保后端服务器已启动（运行 npm start）';
+            }
+        }
+
+        // 页面加载时自动检查服务器状态
+        window.onload = function() {
+            testServerStatus();
+        };
+    </script>
+</body>
+</html>

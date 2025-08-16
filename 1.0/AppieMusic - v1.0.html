@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="zh-cn">
+<head>
+    <meta charset="UTF-8">
+    <title>AppieMusic</title>
+    <style>
+        body { 
+            font-family: Arial, sans-serif; 
+            margin: 0;
+            padding: 0;
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background: #1a1a1a;
+            color: white;
+            overflow: hidden;
+        }
+
+        .background {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-size: cover;
+            filter: blur(30px);
+            opacity: 0.6;
+            z-index: -1;
+        }
+
+        .player {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 30px;
+            border-radius: 20px;
+            backdrop-filter: blur(10px);
+            width: 400px;
+            text-align: center;
+        }
+
+        .playlist {
+            max-height: 300px;
+            overflow-y: auto;
+            margin: 20px 0;
+            text-align: left;
+            padding: 0 20px;
+        }
+
+        .song-item {
+            padding: 10px 15px;
+            margin: 5px 0;
+            border-radius: 10px;
+            background: rgba(255, 255, 255, 0.1);
+            cursor: pointer;
+            transition: all 0.3s;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .song-item:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
+
+        .song-item.active {
+            background: rgba(255, 255, 255, 0.3);
+        }
+
+        .song-title {
+            flex: 1;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        /* 自定义滚动条样式 */
+        .playlist::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .playlist::-webkit-scrollbar-track {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 3px;
+        }
+
+        .playlist::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.3);
+            border-radius: 3px;
+        }
+
+        button {
+            background: rgba(255, 255, 255, 0.2);
+            border: none;
+            padding: 10px 20px;
+            border-radius: 20px;
+            color: white;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        button:hover:not(:disabled) {
+            background: rgba(255, 255, 255, 0.3);
+        }
+
+        .progress {
+            width: 100%;
+            height: 5px;
+            -webkit-appearance: none;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 3px;
+            cursor: pointer;
+        }
+
+        .progress::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 12px;
+            height: 12px;
+            background: white;
+            border-radius: 50%;
+        }
+
+        .time {
+            font-size: 14px;
+            color: rgba(255, 255, 255, 0.8);
+            margin-top: 10px;
+        }
+
+        #fileInput {
+            display: none;
+        }
+
+        .file-label {
+            display: inline-block;
+            padding: 10px 20px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 20px;
+            cursor: pointer;
+            margin-bottom: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="background"></div>
+    <div class="player">
+        <h2>AppieMusic</h2>
+        <label class="file-label" for="fileInput">添加音乐</label>
+        <input type="file" id="fileInput" accept="audio/*" multiple>
+        <div class="playlist" id="playlist">
+            <!-- 歌单列表将通过 JavaScript 动态生成 -->
+        </div>
+        <audio id="audio"></audio>
+        <div class="music-info">
+            <div class="music-title" id="musicTitle">未选择音乐</div>
+        </div>
+        <div class="controls">
+            <button id="playBtn" disabled>播放</button>
+            <button id="pauseBtn" disabled>暂停</button>
+        </div>
+        <input type="range" id="progress" class="progress" value="0" min="0" max="100">
+        <div class="time">
+            <span id="currentTime">00:00</span> / <span id="duration">00:00</span>
+        </div>
+    </div>
+    <script>
+        const fileInput = document.getElementById('fileInput');
+        const audio = document.getElementById('audio');
+        const playBtn = document.getElementById('playBtn');
+        const pauseBtn = document.getElementById('pauseBtn');
+        const progress = document.getElementById('progress');
+        const currentTime = document.getElementById('currentTime');
+        const duration = document.getElementById('duration');
+
+        let playlist = [];
+        let currentTrackIndex = -1;
+
+        function formatTime(sec) {
+            sec = Math.floor(sec);
+            const m = String(Math.floor(sec / 60)).padStart(2, '0');
+            const s = String(sec % 60).padStart(2, '0');
+            return `${m}:${s}`;
+        }
+
+        fileInput.addEventListener('change', function() {
+            const files = Array.from(this.files);
+            files.forEach(file => {
+                const url = URL.createObjectURL(file);
+                playlist.push({
+                    name: file.name.replace(/\.[^/.]+$/, ""),
+                    url: url
+                });
+            });
+            
+            updatePlaylist();
+            if (currentTrackIndex === -1 && playlist.length > 0) {
+                playTrack(0);
+            }
+        });
+
+        function updatePlaylist() {
+            const playlistEl = document.getElementById('playlist');
+            playlistEl.innerHTML = playlist.map((track, index) => `
+                <div class="song-item ${index === currentTrackIndex ? 'active' : ''}" 
+                     onclick="playTrack(${index})">
+                    <span class="song-title">${track.name}</span>
+                </div>
+            `).join('');
+        }
+
+        function playTrack(index) {
+            if (index >= 0 && index < playlist.length) {
+                currentTrackIndex = index;
+                const track = playlist[index];
+                audio.src = track.url;
+                document.getElementById('musicTitle').textContent = track.name;
+                playBtn.disabled = false;
+                pauseBtn.disabled = false;
+                audio.play();
+                updatePlaylist();
+            }
+        }
+
+        // 添加自动播放下一首
+        audio.addEventListener('ended', () => {
+            if (currentTrackIndex < playlist.length - 1) {
+                playTrack(currentTrackIndex + 1);
+            } else {
+                playTrack(0); // 循环播放
+            }
+        });
+
+        playBtn.addEventListener('click', () => audio.play());
+        pauseBtn.addEventListener('click', () => audio.pause());
+
+        audio.addEventListener('loadedmetadata', () => {
+            duration.textContent = formatTime(audio.duration);
+            progress.max = Math.floor(audio.duration);
+        });
+
+        audio.addEventListener('timeupdate', () => {
+            currentTime.textContent = formatTime(audio.currentTime);
+            progress.value = Math.floor(audio.currentTime);
+        });
+
+        progress.addEventListener('input', () => {
+            audio.currentTime = progress.value;
+        });
+
+        // 添加播放状态更新
+        audio.addEventListener('play', () => {
+            playBtn.style.display = 'none';
+            pauseBtn.style.display = 'inline-block';
+        });
+
+        audio.addEventListener('pause', () => {
+            playBtn.style.display = 'inline-block';
+            pauseBtn.style.display = 'none';
+        });
+    </script>
+</body>
+</html>
